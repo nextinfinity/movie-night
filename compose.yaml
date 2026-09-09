@@ -1,0 +1,18 @@
+# Standalone server deployment; no source checkout or local build needed.
+services:
+  movie-night:
+    image: "${MOVIE_NIGHT_IMAGE:?Set MOVIE_NIGHT_IMAGE in .env to your GHCR image}"
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8000}:8000"
+    environment:
+      DEFAULT_USERS: "${DEFAULT_USERS:-}"
+    volumes:
+      - movie-night-data:/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+volumes:
+  movie-night-data:

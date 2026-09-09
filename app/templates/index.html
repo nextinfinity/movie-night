@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10111d">
+  <title>Movie Night — Let the credits decide</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script defer src="{{ url_for('static', filename='app.js') }}"></script>
+</head>
+<body>
+  <header><a class="brand" href="/">◒ &nbsp; MOVIE NIGHT</a><span class="header-note">GOOD COMPANY. GREAT CINEMA.</span></header>
+  <main>
+    <div id="error" class="notice error" role="alert" hidden></div>
+    <section id="setup">
+      <div class="eyebrow">THE HARDEST PART IS CHOOSING.</div>
+      <h1>Your watchlists.<br>One <em>great night.</em></h1>
+      <p class="intro">Bring your people. We'll bring the pick.<br>A little chance, a lot of good taste.</p>
+      <div class="roster-card">
+        <div class="card-heading"><h2>Who's watching?</h2><span>THE GUEST LIST</span></div>
+        <p class="muted">Add Letterboxd usernames or paste profile links.</p>
+        <ul id="users" aria-label="Tonight's users"></ul>
+        <form id="add-form"><label class="sr-only" for="username">Letterboxd username or profile URL</label><input id="username" placeholder="Your Letterboxd username" autocomplete="off" maxlength="160"><button class="secondary" type="submit">+ Add</button></form>
+        <div class="options"><label><input type="checkbox" id="refresh"> Refresh watchlists <small>(cached for 24h)</small></label><label><input type="checkbox" id="repeats"> Include previously locked-in films</label></div>
+        <button id="start" class="primary wide">Find tonight's film <span>↗</span></button>
+      </div>
+      <p class="footnote">Shared picks get extra chances. Every watchlist gets a say.</p>
+    </section>
+    <section id="loading" hidden aria-live="polite" aria-busy="true"><div class="reel">◌</div><div class="eyebrow">A LITTLE MOVIE MAGIC</div><h2 id="loading-title">Raiding the watchlists…</h2><p class="muted">Large watchlists can take a few minutes. Settle in.</p></section>
+    <section id="pick" hidden>
+      <div id="warnings" class="notice" role="status" hidden></div>
+      <div class="film-layout">
+        <div class="poster-stage"><div class="poster-frame"><div id="poster-fallback" class="poster-fallback"><span>◒</span><span id="fallback-title"></span><small>TONIGHT'S FEATURE</small></div><img id="poster" alt="" hidden referrerpolicy="no-referrer"></div></div>
+        <div class="film-info"><div id="pick-eyebrow" class="eyebrow">FATE HAS GOOD TASTE</div><h1 id="title"></h1><div id="metadata" class="metadata"></div><p id="tagline" class="tagline"></p><p id="description" class="description"></p><div id="owners" class="owners"></div><p id="odds" class="muted"></p><a id="film-link" target="_blank" rel="noopener noreferrer">View on Letterboxd ↗</a>
+          <div id="pick-actions" class="actions"><button id="lock" class="primary">That's the one ✦</button><button id="reroll" class="secondary">↻ Pick again</button></div>
+          <div id="celebration" hidden aria-live="polite"><p id="enjoy"></p><button id="restart-locked" class="primary">Plan another movie night ↗</button></div>
+        </div>
+      </div>
+      <button id="restart" class="text-button">← Back to the guest list</button>
+    </section>
+    <section id="empty" hidden><div class="eyebrow">THAT'S A WRAP</div><h1>A tough crowd.<br><em>We like it.</em></h1><p>You've passed on every eligible film.</p><button id="restart-empty" class="primary">Start over ↗</button></section>
+  </main>
+  <footer><span>A SMALL RITUAL FOR THE BIG SCREEN.</span><span>Powered by your Letterboxd watchlists · Unofficial</span></footer>
+</body>
+</html>
