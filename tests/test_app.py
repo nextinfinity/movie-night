@@ -1,6 +1,7 @@
 import json
 import os
 import sqlite3
+import struct
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
@@ -127,14 +128,36 @@ class APITests(unittest.TestCase):
 
     def test_shared_brand_icon_and_favicon(self):
         page = BeautifulSoup(self.client.get("/").get_data(as_text=True), "html.parser")
-        favicon = page.select_one('link[rel="icon"]')
+        favicon = page.select_one('link[rel="icon"][type="image/svg+xml"]')
         brand = page.select_one('.brand img')
-        self.assertEqual(favicon["href"], brand["src"])
+        self.assertEqual(favicon["href"].split("?")[0], brand["src"])
         self.assertEqual(brand["alt"], "")  # Adjacent brand text supplies the accessible name.
         with self.client.get(favicon["href"]) as response:
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.mimetype, "image/svg+xml")
             self.assertEqual(ET.fromstring(response.data).attrib["viewBox"], "0 0 64 64")
+
+    def test_favicon_fallbacks(self):
+        page = BeautifulSoup(self.client.get("/").get_data(as_text=True), "html.parser")
+        for selector, size in [('link[rel="icon"][type="image/png"]', 32),
+                               ('link[rel="apple-touch-icon"]', 180)]:
+            with self.client.get(page.select_one(selector)["href"]) as response:
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.mimetype, "image/png")
+                self.assertTrue(response.data.startswith(b"\x89PNG\r\n\x1a\n"))
+                self.assertEqual(struct.unpack(">II", response.data[16:24]), (size, size))
+        ico = page.select_one('link[rel="icon"]')["href"]
+        for url in [ico, "/favicon.ico"]:
+            with self.client.get(url) as response:
+                self.assertEqual(response.status_code, 200)
+                self.assertIn(response.mimetype, ("image/vnd.microsoft.icon", "image/x-icon"))
+                self.assertEqual(struct.unpack("<HHH", response.data[:6]), (0, 1, 3))
+                for index, size in enumerate((16, 32, 48)):
+                    entry = struct.unpack_from("<BBBBHHII", response.data, 6 + 16 * index)
+                    self.assertEqual(entry[:2], (size, size))
+                    frame = response.data[entry[7]:entry[7] + entry[6]]
+                    self.assertTrue(frame.startswith(b"\x89PNG\r\n\x1a\n"))
+                    self.assertEqual(struct.unpack(">II", frame[16:24]), (size, size))
 
     def test_validation_and_static(self):
         self.assertEqual(self.start(users=["../escape"]).status_code, 400)

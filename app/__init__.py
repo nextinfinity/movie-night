@@ -65,6 +65,10 @@ def create_app(test_config=None):
     def index():
         return render_template("index.html")
 
+    @app.get("/favicon.ico")
+    def favicon():
+        return app.send_static_file("favicon.ico")
+
     @app.get("/health")
     def health():
         return {"status": "ok"}

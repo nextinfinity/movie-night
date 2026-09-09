@@ -56,6 +56,27 @@ jobs:
             sleep 2
           done
           exit 1
+      - name: Smoke-test a host UID with a bind mount
+        shell: bash
+        run: |
+          set -euo pipefail
+          data_dir=$(mktemp -d)
+          trap 'docker logs movie-night-bind || true; docker rm -fv movie-night-bind || true; sudo chown -R "$(id -u):$(id -g)" "$data_dir"' EXIT
+          sudo chown 1000:1000 "$data_dir"
+          docker run -d --name movie-night-bind \
+            --user 1000:1000 \
+            --security-opt no-new-privileges:true --cap-drop ALL \
+            --mount "type=bind,source=$data_dir,target=/data" \
+            -p 127.0.0.1:8000:8000 movie-night:test
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8000/health; then
+              curl --fail --silent http://127.0.0.1:8000/ > /dev/null
+              docker exec movie-night-bind python -c 'import os, sqlite3; assert (os.getuid(), os.getgid()) == (1000, 1000); assert os.stat("/data/movie-night.sqlite3").st_uid == 1000; db = sqlite3.connect("/data/movie-night.sqlite3"); db.execute("CREATE TABLE uid_smoke_test (id INTEGER)"); db.close()'
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
 
   publish:
     needs: test
