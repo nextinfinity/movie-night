@@ -12,29 +12,28 @@ Add your group, draw a film, pass on it, or lock it in with a glowing marquee ce
 
 ## Run with Docker
 
-Download [`compose.yaml`](compose.yaml) and [`.env.example`](.env.example) into a directory on your server. No source checkout or local build is needed.
+Download [`compose.yaml`](compose.yaml) into a directory on your server. No source checkout, local build, or `.env` file is needed.
 
-```sh
-cp .env.example .env
-```
+Optionally edit `DEFAULT_USERS` directly in the file to prefill your guest list (for example, `DEFAULT_USERS: "alice,bob"`). Use your own Letterboxd usernames, separated by commas or whitespace, or leave it empty. You can also add/remove users in the browser.
 
-Edit `.env`:
-
-```dotenv
-MOVIE_NIGHT_IMAGE=ghcr.io/your-owner/movie-night:latest
-DEFAULT_USERS=alice,bob
-BIND_ADDRESS=127.0.0.1
-PORT=8000
-```
-
-Replace the image placeholder with the published GHCR package address. `alice,bob` are placeholder usernames; use your own Letterboxd users, separated by commas or whitespace, or leave `DEFAULT_USERS` empty. You can also add/remove users in the browser.
+The published image is [`ghcr.io/nextinfinity/movie-night`](https://github.com/nextinfinity/movie-night/pkgs/container/movie-night).
 
 ```sh
 docker compose pull
 docker compose up -d
 ```
 
-Open **http://localhost:8000**. For access from other devices, set `BIND_ADDRESS` to your server's LAN IP (for example `192.168.1.20`), rerun `docker compose up -d`, and open `http://192.168.1.20:8000`.
+Open **http://localhost:8000**, or **http://<server-lan-ip>:8000** from another device.
+
+The default `"8000:8000"` publishes on **all host interfaces**. Edit `ports` directly to change this:
+
+- `"8080:8000"` — use host port 8080; the container still listens on 8000.
+- `"127.0.0.1:8000:8000"` — host-local access only, useful for a proxy running on the host.
+- `"192.168.1.20:8000:8000"` — bind to a specific LAN address.
+
+For a containerized reverse proxy, remove `ports` and attach the proxy and app to a shared Docker network. Point the proxy at `http://movie-night:8000`; no host port is needed. Rerun `docker compose up -d` after configuration changes.
+
+**Upgrading from the previous interpolated example?** Copy your desired roster, image, and port/bind settings from `.env` into `compose.yaml` before deploying it. The simplified file no longer reads those values from `.env`.
 
 **Trusted home networks only.** There is no authentication. Do not port-forward this service or expose it through a public tunnel. Use your host/router firewall to restrict access to your LAN; Docker publishing/firewall behavior varies by host.
 
@@ -47,7 +46,7 @@ docker compose pull
 docker compose up -d
 ```
 
-`:latest` tracks successful builds from `main`. For controlled updates, set `MOVIE_NIGHT_IMAGE` to a release such as `:1.0.0`, a `:sha-<full-commit-sha>` tag, or an immutable `@sha256:...` digest. To roll back, restore the previous image reference and run the same commands. Updates on the server are deliberately manual.
+`:latest` tracks successful builds from `main`. For controlled updates, edit `image:` in `compose.yaml` to use a release such as `ghcr.io/nextinfinity/movie-night:1.0.0`, a `:sha-<full-commit-sha>` tag, or an immutable `@sha256:...` digest. To roll back, restore the previous image reference and run the same commands. Updates on the server are deliberately manual.
 
 ### Data and operations
 
@@ -60,7 +59,29 @@ The named `movie-night-data` volume stores watchlist/metadata caches, active rou
 
 Keep the same directory/Compose project name when updating or switching from an older deployment so Docker reuses the existing volume. You can also specify the original project with `docker compose -p <project> ...`. Back up the volume while the service is stopped before upgrades, especially if a future release changes the database schema; rolling back an image cannot undo database changes.
 
-The container runs as non-root UID/GID 10001 with all Linux capabilities dropped and privilege escalation disabled. If replacing the named volume with a host bind mount, give that user write access. `/health` is the container health-check endpoint.
+The container runs as non-root UID/GID 10001 with all Linux capabilities dropped and privilege escalation disabled. `/health` is the container health-check endpoint.
+
+#### Optional: a host directory for backups
+
+The named volume is the recommended default. If you organize application data in nested host directories, replace the service's volume mapping with:
+
+```yaml
+    volumes:
+      - ./config/movienight:/data
+```
+
+The host path is relative to the Compose file. The container destination must be **`/data`**, not `/app/config`. You can remove the unused top-level `volumes:` declaration when using this bind mount.
+
+On a Linux server, prepare the directory before starting the container:
+
+```sh
+mkdir -p ./config/movienight
+sudo chown 10001:10001 ./config/movienight
+```
+
+Keep private data directories outside your source checkout or explicitly ignore them in Git. Back up this directory while the app is stopped so the SQLite database and any journal files are consistent.
+
+Changing the mapping does **not** migrate existing data. Before switching, stop the service and copy the complete contents of its existing `/data` into the new directory, preserving ownership or granting UID/GID 10001 write access to the copied files. Keep the old volume until you've verified the migration.
 
 ## How picks work
 
@@ -97,7 +118,7 @@ flask --app app run --debug --port 8000
 
 Open **http://127.0.0.1:8000**. Flask's debug server is for local use only. Edit templates, CSS, and JS directly.
 
-Docker Compose reads `.env`; these Flask commands use shell environment variables instead:
+For local Flask development, configure the app with shell environment variables:
 
 ```sh
 DEFAULT_USERS=alice,bob DATA_DIR=./data flask --app app run --debug --port 8000
@@ -120,10 +141,11 @@ The standard Compose file is image-only. To test source changes in Docker:
 
 ```sh
 docker build -t movie-night:dev .
-MOVIE_NIGHT_IMAGE=movie-night:dev docker compose up -d --pull never
+# Edit image: in compose.yaml to movie-night:dev, then:
+docker compose up -d --pull never
 ```
 
-This uses the same configured ports and data volume as normal deployment; stop any existing deployment first or use a separate directory/Compose project for isolated testing. No separate development Compose file is required.
+This uses the same configured ports and data volume as normal deployment; stop any existing deployment first or use a separate directory/Compose project for isolated testing. No separate development Compose file is required. Restore the published image reference before committing changes to the example.
 
 ### Tests
 
@@ -133,13 +155,3 @@ node --check app/static/app.js
 ```
 
 Tests cover weighting, vetoes, pagination, metadata, caching, failure handling, persistent history, and API validation using fixtures and mocked network requests. GitHub Actions also validates Compose and builds/smoke-tests the container before publishing.
-
-## Publishing and maintenance
-
-See [`docs/maintaining.md`](docs/maintaining.md) for GitHub setup, GHCR publishing, release tags, and dependency updates.
-
-- `app/core.py` — scraping, metadata, weighted selection
-- `app/__init__.py` — Flask API and SQLite storage
-- `app/templates/`, `app/static/` — interface and animation
-- `compose.yaml`, `.env.example` — published-image deployment
-- `Dockerfile` — image build used locally and by CI

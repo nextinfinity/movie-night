@@ -1,11 +1,11 @@
 # Standalone server deployment; no source checkout or local build needed.
 services:
   movie-night:
-    image: "${MOVIE_NIGHT_IMAGE:?Set MOVIE_NIGHT_IMAGE in .env to your GHCR image}"
+    image: ghcr.io/nextinfinity/movie-night:latest
     ports:
-      - "${BIND_ADDRESS:-127.0.0.1}:${PORT:-8000}:8000"
+      - "8000:8000" # Publishes on all host interfaces; keep access LAN-only.
     environment:
-      DEFAULT_USERS: "${DEFAULT_USERS:-}"
+      DEFAULT_USERS: "" # Optional comma-separated Letterboxd usernames
     volumes:
       - movie-night-data:/data
     restart: unless-stopped

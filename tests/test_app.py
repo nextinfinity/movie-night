@@ -3,7 +3,10 @@ import os
 import sqlite3
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 from unittest.mock import patch
+
+from bs4 import BeautifulSoup
 
 from app import create_app, core
 
@@ -121,6 +124,17 @@ class APITests(unittest.TestCase):
             with patch.dict(os.environ, environment, clear=True):
                 client = create_app({"TESTING": True, "DATA_DIR": self.directory.name}).test_client()
                 self.assertEqual(client.get("/api/config").get_json()["users"], expected)
+
+    def test_shared_brand_icon_and_favicon(self):
+        page = BeautifulSoup(self.client.get("/").get_data(as_text=True), "html.parser")
+        favicon = page.select_one('link[rel="icon"]')
+        brand = page.select_one('.brand img')
+        self.assertEqual(favicon["href"], brand["src"])
+        self.assertEqual(brand["alt"], "")  # Adjacent brand text supplies the accessible name.
+        with self.client.get(favicon["href"]) as response:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.mimetype, "image/svg+xml")
+            self.assertEqual(ET.fromstring(response.data).attrib["viewBox"], "0 0 64 64")
 
     def test_validation_and_static(self):
         self.assertEqual(self.start(users=["../escape"]).status_code, 400)
